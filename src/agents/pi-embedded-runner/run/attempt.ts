@@ -1695,12 +1695,12 @@ export async function runEmbeddedAttempt(
       };
       const commentaryReconciler = (async () => {
         while (!stopCommentaryReconciler) {
-          await sleep(250);
+          await reconcileLiveStreamCommentary();
+          await reconcileFinalizedAssistantOutputs(activeSession.messages);
           if (stopCommentaryReconciler) {
             break;
           }
-          await reconcileLiveStreamCommentary();
-          await reconcileFinalizedAssistantOutputs(activeSession.messages);
+          await sleep(250);
         }
       })();
       try {

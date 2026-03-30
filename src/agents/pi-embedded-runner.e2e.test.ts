@@ -373,4 +373,41 @@ describe("runEmbeddedPiAgent", () => {
     expect(result.payloads).toHaveLength(1);
     expect(result.payloads?.[0]?.text).toBe("repo state now.");
   });
+
+  it("keeps lastAssistant snapshot text instead of falling back to the generic timeout message", async () => {
+    const sessionFile = nextSessionFile();
+    const cfg = createEmbeddedPiRunnerOpenAiConfig(["mock-1"]);
+    const sessionKey = nextSessionKey();
+
+    runEmbeddedAttemptMock.mockResolvedValueOnce(
+      makeEmbeddedRunnerAttempt({
+        timedOut: true,
+        assistantTexts: [],
+        assistantOutputs: [],
+        lastAssistant: buildEmbeddedRunnerAssistant({
+          content: [{ type: "text", text: "Still working through the repo state." }],
+        }),
+      }),
+    );
+
+    const result = await runEmbeddedPiAgent({
+      sessionId: "session:test",
+      sessionKey,
+      sessionFile,
+      workspaceDir,
+      config: cfg,
+      prompt: "status?",
+      provider: "openai",
+      model: "mock-1",
+      timeoutMs: 5_000,
+      agentDir,
+      runId: nextRunId("timeout-last-assistant"),
+      enqueue: immediateEnqueue,
+    });
+
+    expect(result.meta.error).toBeUndefined();
+    expect(result.payloads).toHaveLength(1);
+    expect(result.payloads?.[0]?.isError).toBeUndefined();
+    expect(result.payloads?.[0]?.text).toBe("Still working through the repo state.");
+  });
 });

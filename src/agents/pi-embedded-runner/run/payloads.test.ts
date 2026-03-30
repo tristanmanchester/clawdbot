@@ -159,6 +159,33 @@ describe("buildEmbeddedRunPayloads tool-error warnings", () => {
     expect(payloads[0]?.text).toBe("Still working through the repo state.");
   });
 
+  it("falls back to lastAssistant text when finalized assistant outputs are empty", () => {
+    const payloads = buildPayloads({
+      assistantOutputs: [],
+      assistantTexts: [],
+      lastAssistant: {
+        role: "assistant",
+        content: [{ type: "text", text: "Still working through the repo state." }],
+        stopReason: "stop",
+        api: "openai-responses",
+        provider: "openai",
+        model: "mock-1",
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        timestamp: Date.now(),
+      },
+    });
+
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0]?.text).toBe("Still working through the repo state.");
+  });
+
   it("suppresses JSON NO_REPLY assistant payloads", () => {
     expectNoPayloads({
       assistantTexts: ['{"action":"NO_REPLY"}'],

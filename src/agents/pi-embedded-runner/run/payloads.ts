@@ -15,7 +15,11 @@ import {
   normalizeTextForComparison,
 } from "../../pi-embedded-helpers.js";
 import type { ToolResultFormat } from "../../pi-embedded-subscribe.js";
-import { extractAssistantThinking, formatReasoningMessage } from "../../pi-embedded-utils.js";
+import {
+  extractAssistantText,
+  extractAssistantThinking,
+  formatReasoningMessage,
+} from "../../pi-embedded-utils.js";
 import { isLikelyMutatingToolName } from "../../tool-mutation.js";
 
 type ToolMetaEntry = { toolName: string; meta?: string };
@@ -274,7 +278,13 @@ export function buildEmbeddedRunPayloads(params: {
         return filteredAssistantOutputs;
       }
     }
-    return params.assistantTexts;
+    if (params.assistantTexts.length > 0) {
+      return params.assistantTexts;
+    }
+    const lastAssistantText = params.lastAssistant
+      ? extractAssistantText(params.lastAssistant)
+      : "";
+    return lastAssistantText ? [lastAssistantText] : [];
   })();
   const answerTexts = suppressAssistantArtifacts
     ? []

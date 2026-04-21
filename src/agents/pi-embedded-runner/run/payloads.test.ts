@@ -136,6 +136,24 @@ describe("buildEmbeddedRunPayloads tool-error warnings", () => {
     ]);
   });
 
+  it("uses delivered commentary lengths when stored text is capped", () => {
+    const payloads = buildPayloads({
+      assistantOutputs: [
+        {
+          segmentId: "c1",
+          text: `${"x".repeat(15_000)} done`,
+          phase: "commentary",
+        },
+      ],
+      deliveredCommentarySegmentIds: ["c1"],
+      deliveredCommentarySegmentTexts: new Map([["c1", "x".repeat(10_000)]]),
+      deliveredCommentarySegmentTextLengths: new Map([["c1", 15_000]]),
+    });
+
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0]?.text).toBe("done");
+  });
+
   it("falls back to assistantTexts when delivered commentary strips all assistant outputs", () => {
     const payloads = buildPayloads({
       assistantOutputs: [

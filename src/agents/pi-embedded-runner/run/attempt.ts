@@ -181,6 +181,8 @@ import { detectAndLoadPromptImages } from "./images.js";
 import { resolveLlmIdleTimeoutMs, streamWithIdleTimeout } from "./llm-idle-timeout.js";
 import type { EmbeddedRunAttemptParams, EmbeddedRunAttemptResult } from "./types.js";
 
+const MAX_COMMENTARY_DELIVERY_TIMEOUT_MULTIPLIER = 4;
+
 export {
   appendAttemptCacheTtlIfNeeded,
   composeSystemPromptWithHookContext,
@@ -1271,6 +1273,7 @@ export async function runEmbeddedAttempt(
         unsubscribe,
         deliveredCommentarySegmentIds,
         getDeliveredCommentarySegmentTexts,
+        getDeliveredCommentarySegmentTextLengths,
         getPendingCommentaryDeliveryCount,
         waitForCommentaryDeliveryRound,
         abortCommentaryDelivery,
@@ -1302,13 +1305,26 @@ export async function runEmbeddedAttempt(
         1,
         params.blockReplyTimeoutMs ?? COMMENTARY_REPLY_TIMEOUT_MS,
       );
+      const maxCommentaryDeliveryWaitMs = Math.max(
+        commentaryDeliveryTimeoutMs,
+        COMMENTARY_REPLY_TIMEOUT_MS * MAX_COMMENTARY_DELIVERY_TIMEOUT_MULTIPLIER,
+      );
       const waitForCommentaryDeliveryBounded = async () => {
         if (!params.onCommentaryReply) {
           return;
         }
         while (true) {
-          const pendingCount = Math.max(1, getPendingCommentaryDeliveryCount());
-          const roundTimeoutMs = commentaryDeliveryTimeoutMs * pendingCount;
+          const pendingCount = Math.max(
+            1,
+            Math.min(
+              MAX_COMMENTARY_DELIVERY_TIMEOUT_MULTIPLIER,
+              getPendingCommentaryDeliveryCount(),
+            ),
+          );
+          const roundTimeoutMs = Math.min(
+            maxCommentaryDeliveryWaitMs,
+            commentaryDeliveryTimeoutMs * pendingCount,
+          );
           let timer: NodeJS.Timeout | undefined;
           const timeoutError = new Error(`commentary delivery timed out after ${roundTimeoutMs}ms`);
           timeoutError.name = "AbortError";
@@ -1909,6 +1925,7 @@ export async function runEmbeddedAttempt(
         assistantOutputs,
         deliveredCommentarySegmentIds: deliveredCommentarySegmentIds(),
         deliveredCommentarySegmentTexts: getDeliveredCommentarySegmentTexts(),
+        deliveredCommentarySegmentTextLengths: getDeliveredCommentarySegmentTextLengths(),
         toolMetas: toolMetasNormalized,
         lastAssistant,
         lastToolError: getLastToolError?.(),

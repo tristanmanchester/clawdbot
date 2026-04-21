@@ -20,8 +20,23 @@ export type AssistantOutputCandidate = AssistantOutputEntry & {
   isTerminal: boolean;
 };
 
+export const MAX_ASSISTANT_COMMENTARY_SEGMENT_ID_LENGTH = 128;
+const ASSISTANT_COMMENTARY_SEGMENT_ID_RE = /^[A-Za-z0-9._:@/-]+$/;
+
 export function normalizeAssistantMessagePhase(value: unknown): AssistantMessagePhase | null {
   return value === "commentary" || value === "final_answer" ? value : null;
+}
+
+export function normalizeAssistantOutputSegmentId(value: string): string | null {
+  const trimmed = value.trim();
+  if (
+    trimmed.length === 0 ||
+    trimmed.length > MAX_ASSISTANT_COMMENTARY_SEGMENT_ID_LENGTH ||
+    !ASSISTANT_COMMENTARY_SEGMENT_ID_RE.test(trimmed)
+  ) {
+    return null;
+  }
+  return trimmed;
 }
 
 function sanitizeAssistantSegmentText(text: string, errorContext: boolean) {
@@ -35,22 +50,25 @@ function sanitizeAssistantSegmentText(text: string, errorContext: boolean) {
 
 function parseAssistantTextSignature(
   value: unknown,
-): { id: string; phase?: AssistantMessagePhase } | null {
+): { id?: string; phase?: AssistantMessagePhase } | null {
   if (typeof value !== "string" || value.trim().length === 0) {
     return null;
   }
   const trimmed = value.trim();
   if (!trimmed.startsWith("{")) {
-    return { id: trimmed };
+    const normalizedId = normalizeAssistantOutputSegmentId(trimmed);
+    return normalizedId ? { id: normalizedId } : null;
   }
   try {
     const parsed = JSON.parse(trimmed) as { id?: unknown; phase?: unknown };
-    if (typeof parsed.id !== "string" || parsed.id.trim().length === 0) {
+    const normalizedId =
+      typeof parsed.id === "string" ? normalizeAssistantOutputSegmentId(parsed.id) : null;
+    const normalizedPhase = normalizeAssistantMessagePhase(parsed.phase);
+    if (!normalizedId && !normalizedPhase) {
       return null;
     }
-    const normalizedPhase = normalizeAssistantMessagePhase(parsed.phase);
     return {
-      id: parsed.id,
+      ...(normalizedId ? { id: normalizedId } : {}),
       ...(normalizedPhase ? { phase: normalizedPhase } : {}),
     };
   } catch {

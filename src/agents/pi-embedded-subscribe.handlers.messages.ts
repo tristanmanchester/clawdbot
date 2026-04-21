@@ -69,16 +69,18 @@ function extractAssistantOutputsForMessage(ctx: EmbeddedPiSubscribeContext, msg:
 export function resolveLiveCommentaryDeltaText(params: {
   currentText: string;
   deliveredText?: string;
+  deliveredTextLength?: number;
 }): string | null {
-  const { currentText, deliveredText } = params;
+  const { currentText, deliveredText, deliveredTextLength } = params;
   if (!deliveredText) {
     return currentText;
   }
-  if (currentText === deliveredText) {
+  const deliveredLength = deliveredTextLength ?? deliveredText.length;
+  if (currentText === deliveredText || currentText.length <= deliveredLength) {
     return null;
   }
   if (currentText.startsWith(deliveredText)) {
-    const deltaText = currentText.slice(deliveredText.length);
+    const deltaText = currentText.slice(deliveredLength);
     return deltaText.length > 0 ? deltaText : null;
   }
   return currentText;
@@ -376,9 +378,13 @@ export function handleMessageUpdate(
       continue;
     }
     const deliveredText = ctx.state.deliveredCommentarySegmentTexts.get(segment.segmentId);
+    const deliveredTextLength = ctx.state.deliveredCommentarySegmentTextLengths.get(
+      segment.segmentId,
+    );
     const unsentText = resolveLiveCommentaryDeltaText({
       currentText: segment.text,
       deliveredText,
+      deliveredTextLength,
     });
     if (!unsentText) {
       continue;
@@ -599,9 +605,13 @@ export function handleMessageEnd(
       continue;
     }
     const deliveredText = ctx.state.deliveredCommentarySegmentTexts.get(finalizedSegment.segmentId);
+    const deliveredTextLength = ctx.state.deliveredCommentarySegmentTextLengths.get(
+      finalizedSegment.segmentId,
+    );
     const unsentText = resolveLiveCommentaryDeltaText({
       currentText: finalizedSegment.text,
       deliveredText,
+      deliveredTextLength,
     });
     if (unsentText) {
       ctx.queueCommentaryDelivery(

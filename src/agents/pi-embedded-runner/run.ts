@@ -1264,6 +1264,7 @@ export async function runEmbeddedPiAgent(
             assistantOutputs: attempt.assistantOutputs,
             deliveredCommentarySegmentIds: attempt.deliveredCommentarySegmentIds,
             deliveredCommentarySegmentTexts: attempt.deliveredCommentarySegmentTexts,
+            deliveredCommentarySegmentTextLengths: attempt.deliveredCommentarySegmentTextLengths,
             toolMetas: attempt.toolMetas,
             lastAssistant: attempt.lastAssistant,
             lastToolError: attempt.lastToolError,

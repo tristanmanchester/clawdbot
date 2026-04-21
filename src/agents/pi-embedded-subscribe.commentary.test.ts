@@ -64,6 +64,40 @@ describe("subscribeEmbeddedPiSession commentary delivery", () => {
     expect(subscription.getPendingCommentaryDeliveryCount()).toBe(0);
   });
 
+  it("falls back to generated segment ids for invalid model-provided signatures", async () => {
+    const { emit, subscription } = createSubscribedSessionHarness({
+      runId: "run",
+    });
+
+    emit({
+      type: "message_end",
+      message: buildAssistantMessage({
+        id: "assistant-1",
+        content: [
+          {
+            type: "text",
+            text: "Checking the repo state now.",
+            phase: "commentary",
+            textSignature: JSON.stringify({
+              id: "x".repeat(129),
+              phase: "commentary",
+            }),
+          },
+        ],
+      }),
+    });
+
+    await subscription.waitForCommentaryDelivery();
+
+    expect(subscription.assistantOutputs).toEqual([
+      {
+        segmentId: "assistant:assistant-1:segment:0",
+        text: "Checking the repo state now.",
+        phase: "commentary",
+      },
+    ]);
+  });
+
   it("emits live commentary once after the segment stops being terminal", async () => {
     const onCommentaryReply = vi.fn();
     const { emit, subscription } = createSubscribedSessionHarness({
@@ -247,6 +281,37 @@ describe("subscribeEmbeddedPiSession commentary delivery", () => {
       },
     ]);
     expect(subscription.deliveredCommentarySegmentIds()).toEqual(["sig-1"]);
+  });
+
+  it("caps delivered commentary tracking to a bounded number of segments", async () => {
+    const onCommentaryReply = vi.fn();
+    const { emit, subscription } = createSubscribedSessionHarness({
+      runId: "run",
+      onCommentaryReply,
+    });
+
+    emit({
+      type: "message_end",
+      message: buildAssistantMessage({
+        id: "assistant-1",
+        content: Array.from({ length: 501 }, (_, index) => {
+          return {
+            type: "text",
+            text: `Segment ${index}.`,
+            textSignature: JSON.stringify({
+              id: `sig-${index}`,
+              phase: "commentary",
+            }),
+          };
+        }),
+      }),
+    });
+
+    await subscription.waitForCommentaryDelivery();
+
+    expect(subscription.deliveredCommentarySegmentIds()).toHaveLength(500);
+    expect(subscription.deliveredCommentarySegmentIds()[0]).toBe("sig-1");
+    expect(subscription.getDeliveredCommentarySegmentTexts().has("sig-0")).toBe(false);
   });
 
   it("merges repeated text blocks that share the same signature id", async () => {

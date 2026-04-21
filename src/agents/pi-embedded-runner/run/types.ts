@@ -48,6 +48,7 @@ export type EmbeddedRunAttemptResult = {
   assistantOutputs?: AssistantOutputEntry[];
   deliveredCommentarySegmentIds?: string[];
   deliveredCommentarySegmentTexts?: ReadonlyMap<string, string>;
+  deliveredCommentarySegmentTextLengths?: ReadonlyMap<string, number>;
   toolMetas: Array<{ toolName: string; meta?: string }>;
   lastAssistant: AssistantMessage | undefined;
   lastToolError?: {

@@ -66,6 +66,7 @@ export type EmbeddedPiSubscribeState = {
   pendingCommentarySegmentIds: Set<string>;
   deliveredCommentarySegmentIds: Set<string>;
   deliveredCommentarySegmentTexts: Map<string, string>;
+  deliveredCommentarySegmentTextLengths: Map<string, number>;
   commentaryGeneration: number;
   commentaryQueueVersion: number;
   commentaryAbortControllers: Set<AbortController>;

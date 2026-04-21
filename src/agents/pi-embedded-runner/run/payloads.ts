@@ -94,6 +94,7 @@ export function buildEmbeddedRunPayloads(params: {
   assistantOutputs?: AssistantOutputEntry[];
   deliveredCommentarySegmentIds?: string[];
   deliveredCommentarySegmentTexts?: ReadonlyMap<string, string>;
+  deliveredCommentarySegmentTextLengths?: ReadonlyMap<string, number>;
   toolMetas: ToolMetaEntry[];
   lastAssistant: AssistantMessage | undefined;
   lastToolError?: LastToolError;
@@ -263,11 +264,14 @@ export function buildEmbeddedRunPayloads(params: {
           }
           const deliveredText = params.deliveredCommentarySegmentTexts?.get(segment.segmentId);
           if (deliveredText) {
-            if (segment.text === deliveredText) {
+            const deliveredTextLength =
+              params.deliveredCommentarySegmentTextLengths?.get(segment.segmentId) ??
+              deliveredText.length;
+            if (segment.text === deliveredText || segment.text.length <= deliveredTextLength) {
               return null;
             }
             if (segment.text.startsWith(deliveredText)) {
-              const suffix = segment.text.slice(deliveredText.length);
+              const suffix = segment.text.slice(deliveredTextLength);
               return suffix.length > 0 ? suffix : null;
             }
           }

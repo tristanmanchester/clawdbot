@@ -30,6 +30,8 @@ import { hasNonzeroUsage, normalizeUsage, type UsageLike } from "./usage.js";
 
 const THINKING_TAG_SCAN_RE = /<\s*(\/?)\s*(?:think(?:ing)?|thought|antthinking)\s*>/gi;
 const FINAL_TAG_SCAN_RE = /<\s*(\/?)\s*final\s*>/gi;
+const MAX_TRACKED_DELIVERED_COMMENTARY_SEGMENTS = 500;
+const MAX_STORED_DELIVERED_COMMENTARY_TEXT_LENGTH = 10_000;
 const log = createSubsystemLogger("agent/embedded");
 
 export type {
@@ -75,6 +77,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     pendingCommentarySegmentIds: new Set(),
     deliveredCommentarySegmentIds: new Set(),
     deliveredCommentarySegmentTexts: new Map(),
+    deliveredCommentarySegmentTextLengths: new Map(),
     commentaryGeneration: 0,
     commentaryQueueVersion: 0,
     commentaryAbortControllers: new Set(),
@@ -652,6 +655,27 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     commentaryDeliveryQueue = Promise.resolve();
   };
 
+  const rememberDeliveredCommentarySegment = (segmentId: string, deliveredText: string) => {
+    if (state.deliveredCommentarySegmentIds.has(segmentId)) {
+      state.deliveredCommentarySegmentIds.delete(segmentId);
+    }
+    while (state.deliveredCommentarySegmentIds.size >= MAX_TRACKED_DELIVERED_COMMENTARY_SEGMENTS) {
+      const oldestSegmentId = state.deliveredCommentarySegmentIds.values().next().value;
+      if (!oldestSegmentId) {
+        break;
+      }
+      state.deliveredCommentarySegmentIds.delete(oldestSegmentId);
+      state.deliveredCommentarySegmentTexts.delete(oldestSegmentId);
+      state.deliveredCommentarySegmentTextLengths.delete(oldestSegmentId);
+    }
+    state.deliveredCommentarySegmentIds.add(segmentId);
+    state.deliveredCommentarySegmentTexts.set(
+      segmentId,
+      deliveredText.slice(0, MAX_STORED_DELIVERED_COMMENTARY_TEXT_LENGTH),
+    );
+    state.deliveredCommentarySegmentTextLengths.set(segmentId, deliveredText.length);
+  };
+
   const queueLatestCommentaryDeltaIfNeeded = (segmentId: string) => {
     const latestSegment = state.assistantOutputs.find((entry) => {
       return entry.segmentId === segmentId && entry.phase === "commentary";
@@ -660,9 +684,11 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
       return;
     }
     const deliveredText = state.deliveredCommentarySegmentTexts.get(segmentId);
+    const deliveredTextLength = state.deliveredCommentarySegmentTextLengths.get(segmentId);
     const unsentText = resolveLiveCommentaryDeltaText({
       currentText: latestSegment.text,
       deliveredText,
+      deliveredTextLength,
     });
     if (!unsentText) {
       return;
@@ -727,8 +753,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
         if (generation !== state.commentaryGeneration || abortController.signal.aborted) {
           return;
         }
-        state.deliveredCommentarySegmentIds.add(segment.segmentId);
-        state.deliveredCommentarySegmentTexts.set(
+        rememberDeliveredCommentarySegment(
           segment.segmentId,
           options?.deliveredText ?? segment.text,
         );
@@ -892,6 +917,8 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     getCompactionCount: () => compactionCount,
     deliveredCommentarySegmentIds: () => Array.from(state.deliveredCommentarySegmentIds),
     getDeliveredCommentarySegmentTexts: () => new Map(state.deliveredCommentarySegmentTexts),
+    getDeliveredCommentarySegmentTextLengths: () =>
+      new Map(state.deliveredCommentarySegmentTextLengths),
     getPendingCommentaryDeliveryCount: () => state.pendingCommentarySegmentIds.size,
     waitForCommentaryDeliveryRound,
     waitForCommentaryDelivery,
